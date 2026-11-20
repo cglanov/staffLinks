@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AAEE Staff Links</title>
+  <style>
+    :root {
+      --purple-dark: #4c1d95;
+      --purple-primary: #6d28d9;
+      --purple-accent: #7c3aed;
+      --purple-light: #f3e8ff;
+      --purple-border: #ddd6fe;
+      --white: #ffffff;
+      --text-dark: #1e1b4b;
+      --text-muted: #5b21b6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--white);
+      color: var(--text-dark);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Banner */
+    header.banner {
+      background: linear-gradient(135deg, var(--purple-dark) 0%, var(--purple-primary) 100%);
+      color: var(--white);
+      padding: 2.25rem 1.5rem;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(76, 29, 149, 0.18);
+    }
+
+    header.banner h1 {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    /* Main Container */
+    main {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem;
+      flex: 1;
+    }
+
+    /* Button Grid */
+    .links-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 1.25rem;
+    }
+
+    /* Link Buttons */
+    .link-btn {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background-color: var(--white);
+      border: 2px solid var(--purple-primary);
+      border-radius: 12px;
+      padding: 1.35rem 1.5rem;
+      text-decoration: none;
+      box-shadow: 0 2px 6px rgba(109, 40, 217, 0.08);
+      transition: transform 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+
+    .link-btn:hover,
+    .link-btn:focus-visible {
+      background-color: var(--purple-primary);
+      border-color: var(--purple-dark);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(109, 40, 217, 0.22);
+      outline: none;
+    }
+
+    .link-label {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--purple-dark);
+      line-height: 1.3;
+      transition: color 0.16s ease;
+    }
+
+    .link-desc {
+      margin-top: 0.45rem;
+      font-size: 0.925rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      line-height: 1.45;
+      transition: color 0.16s ease;
+    }
+
+    .link-btn:hover .link-label,
+    .link-btn:focus-visible .link-label,
+    .link-btn:hover .link-desc,
+    .link-btn:focus-visible .link-desc {
+      color: var(--white);
+    }
+
+    /* Status & Error States */
+    .status-box {
+      text-align: center;
+      padding: 3rem 1.5rem;
+      border: 2px dashed var(--purple-border);
+      border-radius: 12px;
+      background-color: var(--purple-light);
+      color: var(--purple-dark);
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 4px solid var(--purple-border);
+      border-top-color: var(--purple-primary);
+      border-radius: 50%;
+      margin: 0 auto 1rem;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="banner">
+    <h1>AAEE Staff Links</h1>
+  </header>
+
+  <main>
+    <div id="status" class="status-box">
+      <div class="spinner"></div>
+      Loading links...
+    </div>
+    <div id="links-container" class="links-grid" hidden></div>
+  </main>
+
+  <script>
+    const SHEET_ID = "1A9OR5yTFmVAqRJSvpMpNK37Xg1VUA7PO3D7hpJUaIiw";
+    const GID = "0";
+    const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}`;
+
+    // RFC-4180 compliant CSV parser (handles commas and line breaks inside quoted cells)
+    function parseCSV(text) {
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let inQuotes = false;
+
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const nextChar = text[i + 1];
+
+        if (inQuotes) {
+          if (char === '"' && nextChar === '"') {
+            cell += '"';
+            i++;
+          } else if (char === '"') {
+            inQuotes = false;
+          } else {
+            cell += char;
+          }
+        } else {
+          if (char === '"') {
+            inQuotes = true;
+          } else if (char === ",") {
+            row.push(cell.trim());
+            cell = "";
+          } else if (char === "\r" && nextChar === "\n") {
+            row.push(cell.trim());
+            rows.push(row);
+            row = [];
+            cell = "";
+            i++;
+          } else if (char === "\n" || char === "\r") {
+            row.push(cell.trim());
+            rows.push(row);
+            row = [];
+            cell = "";
+          } else {
+            cell += char;
+          }
+        }
+      }
+
+      if (cell.length > 0 || row.length > 0) {
+        row.push(cell.trim());
+        rows.push(row);
+      }
+
+      return rows;
+    }
+
+    function normalizeUrl(rawUrl) {
+      const trimmed = rawUrl.trim();
+      if (!trimmed) return null;
+      if (/^javascript:/i.test(trimmed)) return null;
+      if (/^(https?:\/\/|mailto:|tel:|\/)/i.test(trimmed)) return trimmed;
+      return `https://${trimmed}`;
+    }
+
+    async function loadLinks() {
+      const statusEl = document.getElementById("status");
+      const containerEl = document.getElementById("links-container");
+
+      try {
+        const response = await fetch(CSV_URL);
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+
+        const csvText = await response.text();
+        const rows = parseCSV(csvText);
+
+        // Skip row 1 (index 0) and filter out rows missing a label or URL
+        const dataRows = rows.slice(1).filter(row => row[0] && row[1]);
+
+        if (dataRows.length === 0) {
+          statusEl.textContent = "No links found in the spreadsheet after row 1.";
+          return;
+        }
+
+        dataRows.forEach(row => {
+          const labelText = row[0];
+          const url = normalizeUrl(row[1]);
+          const descriptionText = row[2] || "";
+
+          if (!url) return;
+
+          const anchor = document.createElement("a");
+          anchor.className = "link-btn";
+          anchor.href = url;
+          anchor.target = "_blank";
+          anchor.rel = "noopener noreferrer";
+
+          const labelEl = document.createElement("span");
+          labelEl.className = "link-label";
+          labelEl.textContent = labelText;
+          anchor.appendChild(labelEl);
+
+          if (descriptionText) {
+            const descEl = document.createElement("span");
+            descEl.className = "link-desc";
+            descEl.textContent = descriptionText;
+            anchor.appendChild(descEl);
+          }
+
+          containerEl.appendChild(anchor);
+        });
+
+        statusEl.hidden = true;
+        containerEl.hidden = false;
+      } catch (error) {
+        console.error("Failed to load Google Sheet:", error);
+        statusEl.innerHTML = `
+          <strong>Unable to load links from Google Sheets.</strong><br>
+          Make sure the spreadsheet sharing setting is set to <em>"Anyone with the link" (Viewer)</em>.
+        `;
+      }
+    }
+
+    loadLinks();
+  </script>
+</body>
+</html>
