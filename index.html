@@ -65,12 +65,13 @@
     /* Link Buttons */
     .link-btn {
       display: flex;
-      flex-direction: column;
-      justify-content: center;
+      flex-direction: row;
+      align-items: center;
+      gap: 1rem;
       background-color: var(--white);
       border: 2px solid var(--purple-primary);
       border-radius: 12px;
-      padding: 1.35rem 1.5rem;
+      padding: 1.25rem 1.35rem;
       text-decoration: none;
       box-shadow: 0 2px 6px rgba(109, 40, 217, 0.08);
       transition: transform 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
@@ -85,6 +86,36 @@
       outline: none;
     }
 
+    /* Button Icon Container */
+    .link-icon-wrap {
+      width: 56px;
+      height: 56px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--white);
+      border: 1px solid var(--purple-border);
+      border-radius: 10px;
+      padding: 4px;
+      overflow: hidden;
+    }
+
+    .link-icon {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* Button Text Stack */
+    .link-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+    }
+
     .link-label {
       font-size: 1.25rem;
       font-weight: 700;
@@ -94,7 +125,7 @@
     }
 
     .link-desc {
-      margin-top: 0.45rem;
+      margin-top: 0.4rem;
       font-size: 0.925rem;
       font-weight: 400;
       color: var(--text-muted);
@@ -154,6 +185,27 @@
     const SHEET_ID = "1A9OR5yTFmVAqRJSvpMpNK37Xg1VUA7PO3D7hpJUaIiw";
     const GID = "0";
     const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}`;
+
+    // If you move the image files into a subfolder (e.g., "images/"), set that path here.
+    const IMAGE_FOLDER = "";
+
+    // Maps button titles from Column A to your exact image filenames
+    const BUTTON_ICONS = [
+      { pattern: /\bbehavior\b/i, file: "behavior.png" },
+      { pattern: /\bconferences?\b/i, file: "conference.webp" },
+      { pattern: /flash\s*feedback/i, file: "flashfeedback.png" },
+      { pattern: /\bfrontline\b/i, file: "frontline.png" },
+      { pattern: /\bit\b/i, file: "it.png" },
+      { pattern: /\blevel\s*2\b/i, file: "level2.png" },
+      { pattern: /\bmunis\b/i, file: "munis.png" },
+      { pattern: /power\s*school/i, file: "Powerschool.png" },
+      { pattern: /\bstar\b/i, file: "star.png" }
+    ];
+
+    function getIconForLabel(label) {
+      const match = BUTTON_ICONS.find(entry => entry.pattern.test(label));
+      return match ? `${IMAGE_FOLDER}${match.file}` : null;
+    }
 
     // RFC-4180 compliant CSV parser (handles commas and line breaks inside quoted cells)
     function parseCSV(text) {
@@ -248,18 +300,38 @@
           anchor.target = "_blank";
           anchor.rel = "noopener noreferrer";
 
+          const iconSrc = getIconForLabel(labelText);
+          if (iconSrc) {
+            const iconWrap = document.createElement("div");
+            iconWrap.className = "link-icon-wrap";
+
+            const img = document.createElement("img");
+            img.className = "link-icon";
+            img.src = iconSrc;
+            img.alt = "";
+            img.loading = "lazy";
+            img.onerror = () => iconWrap.remove();
+
+            iconWrap.appendChild(img);
+            anchor.appendChild(iconWrap);
+          }
+
+          const contentEl = document.createElement("div");
+          contentEl.className = "link-content";
+
           const labelEl = document.createElement("span");
           labelEl.className = "link-label";
           labelEl.textContent = labelText;
-          anchor.appendChild(labelEl);
+          contentEl.appendChild(labelEl);
 
           if (descriptionText) {
             const descEl = document.createElement("span");
             descEl.className = "link-desc";
             descEl.textContent = descriptionText;
-            anchor.appendChild(descEl);
+            contentEl.appendChild(descEl);
           }
 
+          anchor.appendChild(contentEl);
           containerEl.appendChild(anchor);
         });
 
