@@ -186,28 +186,6 @@
     const GID = "0";
     const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}`;
 
-    // If you move the image files into a subfolder (e.g., "images/"), set that path here.
-    const IMAGE_FOLDER = "";
-
-    // Maps button titles from Column A to your exact image filenames
-    const BUTTON_ICONS = [
-      { pattern: /\bbehavior\b/i, file: "behavior.png" },
-      { pattern: /\bconferences?\b/i, file: "conference.webp" },
-      { pattern: /\bdismiss(al)?\b/i, file: "dismiss.png" },
-      { pattern: /flash\s*feedback/i, file: "flashfeedback.png" },
-      { pattern: /\bfrontline\b/i, file: "frontline.png" },
-      { pattern: /\bit\b/i, file: "it.png" },
-      { pattern: /\blevel\s*2\b/i, file: "level2.png" },
-      { pattern: /\bmunis\b/i, file: "munis.png" },
-      { pattern: /power\s*school/i, file: "Powerschool.png" },
-      { pattern: /\bstars?\b/i, file: "star.png" }
-    ];
-
-    function getIconForLabel(label) {
-      const match = BUTTON_ICONS.find(entry => entry.pattern.test(label));
-      return match ? `${IMAGE_FOLDER}${match.file}` : null;
-    }
-
     // RFC-4180 compliant CSV parser (handles commas and line breaks inside quoted cells)
     function parseCSV(text) {
       const rows = [];
@@ -267,6 +245,19 @@
       return `https://${trimmed}`;
     }
 
+    function normalizeImageUrl(rawUrl) {
+      const normalized = normalizeUrl(rawUrl);
+      if (!normalized || /^(mailto:|tel:)/i.test(normalized)) return null;
+
+      // Convert standard Google Drive file sharing links into direct embeddable image URLs
+      const driveMatch = normalized.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/i);
+      if (driveMatch) {
+        return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w256`;
+      }
+
+      return normalized;
+    }
+
     async function loadLinks() {
       const statusEl = document.getElementById("status");
       const containerEl = document.getElementById("links-container");
@@ -280,7 +271,7 @@
         const csvText = await response.text();
         const rows = parseCSV(csvText);
 
-        // Skip row 1 (index 0) and filter out rows missing a label or URL
+        // Skip row 1 (index 0) and filter out rows missing a label (Col A) or URL (Col B)
         const dataRows = rows.slice(1).filter(row => row[0] && row[1]);
 
         if (dataRows.length === 0) {
@@ -292,6 +283,7 @@
           const labelText = row[0];
           const url = normalizeUrl(row[1]);
           const descriptionText = row[2] || "";
+          const iconSrc = normalizeImageUrl(row[3] || "");
 
           if (!url) return;
 
@@ -301,7 +293,6 @@
           anchor.target = "_blank";
           anchor.rel = "noopener noreferrer";
 
-          const iconSrc = getIconForLabel(labelText);
           if (iconSrc) {
             const iconWrap = document.createElement("div");
             iconWrap.className = "link-icon-wrap";
