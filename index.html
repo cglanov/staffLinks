@@ -63,16 +63,18 @@
       gap: 1.25rem;
     }
 
-    /* Link Buttons */
+    /* Fixed-Height Link Buttons */
     .link-btn {
+      position: relative;
       display: flex;
       flex-direction: row;
       align-items: center;
-      gap: 1rem;
+      gap: 0.9rem;
+      height: 112px;
       background-color: var(--white);
       border: 2px solid var(--purple-primary);
       border-radius: 12px;
-      padding: 1.25rem 1.35rem;
+      padding: 0 1.1rem 0 5px;
       text-decoration: none;
       box-shadow: 0 2px 6px rgba(109, 40, 217, 0.08);
       transition: transform 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
@@ -80,6 +82,7 @@
 
     .link-btn:hover,
     .link-btn:focus-visible {
+      z-index: 20;
       background-color: var(--purple-primary);
       border-color: var(--purple-dark);
       transform: translateY(-3px);
@@ -87,17 +90,17 @@
       outline: none;
     }
 
-    /* Button Icon Container */
+    /* Dominant Left Icon (90% of button height) */
     .link-icon-wrap {
-      width: 56px;
-      height: 56px;
+      height: 90%;
+      aspect-ratio: 1 / 1;
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       background-color: var(--white);
       border: 1px solid var(--purple-border);
-      border-radius: 10px;
+      border-radius: 9px;
       padding: 4px;
       overflow: hidden;
     }
@@ -111,26 +114,32 @@
 
     /* Button Text Stack */
     .link-content {
+      flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: center;
       min-width: 0;
+      height: 100%;
+      padding: 8px 0;
+      overflow: hidden;
     }
 
     .link-label {
       font-size: 1.25rem;
       font-weight: 700;
       color: var(--purple-dark);
-      line-height: 1.3;
+      line-height: 1.25;
+      overflow-wrap: break-word;
       transition: color 0.16s ease;
     }
 
     .link-desc {
-      margin-top: 0.4rem;
+      margin-top: 0.35rem;
       font-size: 0.925rem;
       font-weight: 400;
       color: var(--text-muted);
-      line-height: 1.45;
+      line-height: 1.38;
+      overflow-wrap: break-word;
       transition: color 0.16s ease;
     }
 
@@ -138,6 +147,55 @@
     .link-btn:focus-visible .link-label,
     .link-btn:hover .link-desc,
     .link-btn:focus-visible .link-desc {
+      color: var(--white);
+    }
+
+    /* Hover Tooltip for Truncated Text */
+    .link-tooltip {
+      position: absolute;
+      left: -2px;
+      right: -2px;
+      top: calc(100% + 8px);
+      z-index: 50;
+      background-color: var(--text-dark);
+      color: var(--white);
+      border: 2px solid var(--purple-primary);
+      border-radius: 10px;
+      padding: 0.75rem 0.95rem;
+      box-shadow: 0 12px 28px rgba(30, 27, 75, 0.28);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-4px);
+      transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+      pointer-events: none;
+    }
+
+    .link-tooltip.tooltip-above {
+      top: auto;
+      bottom: calc(100% + 8px);
+      transform: translateY(4px);
+    }
+
+    .link-btn.has-overflow:hover .link-tooltip,
+    .link-btn.has-overflow:focus-visible .link-tooltip {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .link-tooltip-title {
+      display: block;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--purple-border);
+      margin-bottom: 0.25rem;
+    }
+
+    .link-tooltip-desc {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 400;
+      line-height: 1.45;
       color: var(--white);
     }
 
@@ -259,6 +317,135 @@
       return normalized;
     }
 
+    function fitButtonText(anchor) {
+      const contentEl = anchor.querySelector(".link-content");
+      const labelEl = anchor.querySelector(".link-label");
+      const descEl = anchor.querySelector(".link-desc");
+      const tooltipEl = anchor.querySelector(".link-tooltip");
+
+      if (!contentEl || !labelEl) return;
+
+      const DEFAULT_LABEL_SIZE = 20;   // 1.25rem
+      const MIN_LABEL_SIZE = 15.5;     // ~0.97rem
+      const DEFAULT_DESC_SIZE = 14.8;  // 0.925rem
+      const MIN_DESC_SIZE = 12;        // 0.75rem
+
+      // Reset styles to defaults before measuring
+      labelEl.style.fontSize = `${DEFAULT_LABEL_SIZE}px`;
+      labelEl.style.display = "";
+      labelEl.style.webkitLineClamp = "";
+      labelEl.style.webkitBoxOrient = "";
+      labelEl.style.overflow = "";
+
+      if (descEl) {
+        descEl.style.fontSize = `${DEFAULT_DESC_SIZE}px`;
+        descEl.style.display = "";
+        descEl.style.webkitLineClamp = "";
+        descEl.style.webkitBoxOrient = "";
+        descEl.style.overflow = "";
+      }
+
+      anchor.classList.remove("has-overflow");
+      if (tooltipEl) tooltipEl.hidden = true;
+
+      const contentStyle = getComputedStyle(contentEl);
+      const padTop = parseFloat(contentStyle.paddingTop) || 0;
+      const padBottom = parseFloat(contentStyle.paddingBottom) || 0;
+      const maxTextHeight = contentEl.clientHeight - padTop - padBottom;
+      const maxTextWidth = contentEl.clientWidth;
+
+      const overflows = () => {
+        let totalHeight = labelEl.offsetHeight;
+        let widest = labelEl.scrollWidth;
+
+        if (descEl) {
+          const descMarginTop = parseFloat(getComputedStyle(descEl).marginTop) || 0;
+          totalHeight += descMarginTop + descEl.offsetHeight;
+          widest = Math.max(widest, descEl.scrollWidth);
+        }
+
+        return totalHeight > maxTextHeight + 0.5 || widest > maxTextWidth + 1;
+      };
+
+      // 1. Default sizes fit cleanly
+      if (!overflows()) return;
+
+      // 2. Dynamically shrink text sizes to fit within the fixed height
+      let labelSize = DEFAULT_LABEL_SIZE;
+      let descSize = DEFAULT_DESC_SIZE;
+      let fits = false;
+
+      while (labelSize > MIN_LABEL_SIZE || (descEl && descSize > MIN_DESC_SIZE)) {
+        if (descEl && descSize > MIN_DESC_SIZE) {
+          descSize = Math.max(MIN_DESC_SIZE, descSize - 0.5);
+          descEl.style.fontSize = `${descSize}px`;
+        }
+        if (!overflows()) {
+          fits = true;
+          break;
+        }
+        if (labelSize > MIN_LABEL_SIZE) {
+          labelSize = Math.max(MIN_LABEL_SIZE, labelSize - 0.5);
+          labelEl.style.fontSize = `${labelSize}px`;
+        }
+        if (!overflows()) {
+          fits = true;
+          break;
+        }
+      }
+
+      if (fits) return;
+
+      // 3. Text is way too long: revert to default size and truncate with '...'
+      labelEl.style.fontSize = `${DEFAULT_LABEL_SIZE}px`;
+
+      if (descEl) {
+        descEl.style.fontSize = `${DEFAULT_DESC_SIZE}px`;
+
+        const labelLineHeight = parseFloat(getComputedStyle(labelEl).lineHeight) || DEFAULT_LABEL_SIZE * 1.25;
+        const maxLabelLines = 2;
+        if (labelEl.offsetHeight > labelLineHeight * maxLabelLines + 2) {
+          labelEl.style.display = "-webkit-box";
+          labelEl.style.webkitBoxOrient = "vertical";
+          labelEl.style.webkitLineClamp = String(maxLabelLines);
+          labelEl.style.overflow = "hidden";
+        }
+
+        const descMarginTop = parseFloat(getComputedStyle(descEl).marginTop) || 0;
+        const availableDescHeight = maxTextHeight - labelEl.offsetHeight - descMarginTop;
+        const descLineHeight = parseFloat(getComputedStyle(descEl).lineHeight) || DEFAULT_DESC_SIZE * 1.38;
+        const maxDescLines = Math.max(1, Math.floor((availableDescHeight + 1) / descLineHeight));
+
+        descEl.style.display = "-webkit-box";
+        descEl.style.webkitBoxOrient = "vertical";
+        descEl.style.webkitLineClamp = String(maxDescLines);
+        descEl.style.overflow = "hidden";
+      } else {
+        const labelLineHeight = parseFloat(getComputedStyle(labelEl).lineHeight) || DEFAULT_LABEL_SIZE * 1.25;
+        const maxLabelLines = Math.max(1, Math.floor((maxTextHeight + 1) / labelLineHeight));
+        labelEl.style.display = "-webkit-box";
+        labelEl.style.webkitBoxOrient = "vertical";
+        labelEl.style.webkitLineClamp = String(maxLabelLines);
+        labelEl.style.overflow = "hidden";
+      }
+
+      anchor.classList.add("has-overflow");
+      if (tooltipEl) tooltipEl.hidden = false;
+    }
+
+    function fitAllButtons(containerEl) {
+      containerEl.querySelectorAll(".link-btn").forEach(fitButtonText);
+    }
+
+    function updateTooltipPlacement(anchor) {
+      const tooltipEl = anchor.querySelector(".link-tooltip");
+      if (!tooltipEl || tooltipEl.hidden) return;
+      const rect = anchor.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      tooltipEl.classList.toggle("tooltip-above", spaceBelow < 160 && spaceAbove > spaceBelow);
+    }
+
     async function loadLinks() {
       const statusEl = document.getElementById("status");
       const containerEl = document.getElementById("links-container");
@@ -303,7 +490,10 @@
             img.src = iconSrc;
             img.alt = "";
             img.loading = "lazy";
-            img.onerror = () => iconWrap.remove();
+            img.onerror = () => {
+              iconWrap.remove();
+              fitButtonText(anchor);
+            };
 
             iconWrap.appendChild(img);
             anchor.appendChild(iconWrap);
@@ -325,11 +515,44 @@
           }
 
           anchor.appendChild(contentEl);
+
+          // Tooltip element (shown on hover/focus only when text is truncated)
+          const tooltipEl = document.createElement("div");
+          tooltipEl.className = "link-tooltip";
+          tooltipEl.setAttribute("role", "tooltip");
+          tooltipEl.hidden = true;
+
+          const tooltipTitle = document.createElement("span");
+          tooltipTitle.className = "link-tooltip-title";
+          tooltipTitle.textContent = labelText;
+          tooltipEl.appendChild(tooltipTitle);
+
+          if (descriptionText) {
+            const tooltipDesc = document.createElement("span");
+            tooltipDesc.className = "link-tooltip-desc";
+            tooltipDesc.textContent = descriptionText;
+            tooltipEl.appendChild(tooltipDesc);
+          }
+
+          anchor.appendChild(tooltipEl);
+
+          anchor.addEventListener("mouseenter", () => updateTooltipPlacement(anchor));
+          anchor.addEventListener("focus", () => updateTooltipPlacement(anchor));
+
           containerEl.appendChild(anchor);
         });
 
         statusEl.hidden = true;
         containerEl.hidden = false;
+        fitAllButtons(containerEl);
+
+        // Re-evaluate text fitting whenever grid column widths change
+        let resizeRaf = null;
+        const observer = new ResizeObserver(() => {
+          if (resizeRaf) cancelAnimationFrame(resizeRaf);
+          resizeRaf = requestAnimationFrame(() => fitAllButtons(containerEl));
+        });
+        observer.observe(containerEl);
       } catch (error) {
         console.error("Failed to load Google Sheet:", error);
         statusEl.innerHTML = `
