@@ -23,6 +23,10 @@
       padding: 0;
     }
 
+    html {
+      scrollbar-gutter: stable;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background-color: var(--white);
@@ -36,13 +40,14 @@
     header.banner {
       background: linear-gradient(135deg, var(--purple-dark) 0%, var(--purple-primary) 100%);
       color: var(--white);
-      padding: 2.25rem 1.5rem;
+      padding: clamp(1rem, 2.6vh, 2rem) 1.5rem;
       text-align: center;
       box-shadow: 0 4px 12px rgba(76, 29, 149, 0.18);
+      flex-shrink: 0;
     }
 
     header.banner h1 {
-      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-size: clamp(1.5rem, 3.5vw, 2.4rem);
       font-weight: 800;
       letter-spacing: -0.02em;
     }
@@ -50,31 +55,33 @@
     /* Main Container */
     main {
       width: 100%;
-      max-width: 1100px;
       margin: 0 auto;
-      padding: 2.5rem 1.5rem;
+      padding: clamp(0.85rem, 2vh, 1.75rem) clamp(0.85rem, 2vw, 2rem);
       flex: 1;
     }
 
-    /* Button Grid */
+    /* Dynamic Button Grid */
     .links-grid {
+      --btn-height: 112px;
+      --grid-gap: 16px;
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-      gap: 1.25rem;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: var(--grid-gap);
+      align-content: start;
     }
 
-    /* Fixed-Height Link Buttons */
+    /* Dynamically Sized Link Buttons */
     .link-btn {
       position: relative;
       display: flex;
       flex-direction: row;
       align-items: center;
-      gap: 0.9rem;
-      height: 112px;
+      gap: clamp(0.5rem, calc(var(--btn-height) * 0.11), 1.1rem);
+      height: var(--btn-height);
       background-color: var(--white);
       border: 2px solid var(--purple-primary);
-      border-radius: 12px;
-      padding: 0 1.1rem 0 5px;
+      border-radius: clamp(9px, calc(var(--btn-height) * 0.11), 14px);
+      padding: 0 clamp(0.65rem, calc(var(--btn-height) * 0.14), 1.25rem) 0 5px;
       text-decoration: none;
       box-shadow: 0 2px 6px rgba(109, 40, 217, 0.08);
       transition: transform 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
@@ -100,7 +107,7 @@
       justify-content: center;
       background-color: var(--white);
       border: 1px solid var(--purple-border);
-      border-radius: 9px;
+      border-radius: clamp(6px, calc(var(--btn-height) * 0.08), 10px);
       padding: 4px;
       overflow: hidden;
     }
@@ -120,7 +127,7 @@
       justify-content: center;
       min-width: 0;
       height: 100%;
-      padding: 8px 0;
+      padding: clamp(4px, calc(var(--btn-height) * 0.07), 10px) 0;
       overflow: hidden;
     }
 
@@ -128,17 +135,17 @@
       font-size: 1.25rem;
       font-weight: 700;
       color: var(--purple-dark);
-      line-height: 1.25;
+      line-height: 1.22;
       overflow-wrap: break-word;
       transition: color 0.16s ease;
     }
 
     .link-desc {
-      margin-top: 0.35rem;
+      margin-top: clamp(2px, calc(var(--btn-height) * 0.045), 6px);
       font-size: 0.925rem;
       font-weight: 400;
       color: var(--text-muted);
-      line-height: 1.38;
+      line-height: 1.35;
       overflow-wrap: break-word;
       transition: color 0.16s ease;
     }
@@ -201,6 +208,8 @@
 
     /* Status & Error States */
     .status-box {
+      max-width: 720px;
+      margin: 2rem auto 0;
       text-align: center;
       padding: 3rem 1.5rem;
       border: 2px dashed var(--purple-border);
@@ -244,6 +253,16 @@
     const SHEET_ID = "1A9OR5yTFmVAqRJSvpMpNK37Xg1VUA7PO3D7hpJUaIiw";
     const GID = "0";
     const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}`;
+
+    // Dynamic button sizing limits (adjust these to change when buttons stop shrinking and start spilling)
+    const LAYOUT_CONFIG = {
+      minWidth: 220,        // Minimum button width (px) before wrapping to fewer columns
+      minHeight: 76,        // Minimum button height (px) before spilling into scrollable rows below
+      maxHeight: 165,       // Maximum button height (px) when there are only a few buttons
+      maxHeightRatio: 0.42, // Caps button height relative to width so the square icon never crowds out text
+      minGap: 10,           // Minimum grid gap (px)
+      maxGap: 20            // Maximum grid gap (px)
+    };
 
     // RFC-4180 compliant CSV parser (handles commas and line breaks inside quoted cells)
     function parseCSV(text) {
@@ -317,6 +336,70 @@
       return normalized;
     }
 
+    function updateGridLayout(containerEl) {
+      const buttons = containerEl.querySelectorAll(".link-btn");
+      const count = buttons.length;
+      if (count === 0) return;
+
+      const mainEl = containerEl.parentElement;
+      const headerEl = document.querySelector("header.banner");
+      const mainStyle = getComputedStyle(mainEl);
+
+      const padX = (parseFloat(mainStyle.paddingLeft) || 0) + (parseFloat(mainStyle.paddingRight) || 0);
+      const padY = (parseFloat(mainStyle.paddingTop) || 0) + (parseFloat(mainStyle.paddingBottom) || 0);
+      const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
+
+      const availW = Math.max(LAYOUT_CONFIG.minWidth, mainEl.clientWidth - padX);
+      const availH = Math.max(LAYOUT_CONFIG.minHeight, window.innerHeight - headerHeight - padY);
+
+      // Scale gap softly with viewport size
+      const gap = Math.round(
+        Math.max(LAYOUT_CONFIG.minGap, Math.min(LAYOUT_CONFIG.maxGap, Math.min(availW, availH) * 0.02))
+      );
+
+      const maxCols = Math.max(
+        1,
+        Math.min(count, Math.floor((availW + gap) / (LAYOUT_CONFIG.minWidth + gap)))
+      );
+
+      let bestLayout = null;
+
+      // Find the best column/row arrangement that fits completely within the viewport
+      for (let cols = 1; cols <= maxCols; cols++) {
+        const rows = Math.ceil(count / cols);
+        const btnW = (availW - (cols - 1) * gap) / cols;
+        const maxRowH = (availH - (rows - 1) * gap) / rows;
+
+        // Skip layouts that would force buttons below the minimum height limit
+        if (maxRowH < LAYOUT_CONFIG.minHeight) continue;
+
+        const btnH = Math.min(
+          maxRowH,
+          LAYOUT_CONFIG.maxHeight,
+          btnW * LAYOUT_CONFIG.maxHeightRatio
+        );
+
+        if (btnH < LAYOUT_CONFIG.minHeight) continue;
+
+        // Favor taller, well-proportioned cards over overly wide, skinny strips
+        const score = btnH * Math.min(btnW, btnH * 3.4);
+
+        if (!bestLayout || score > bestLayout.score) {
+          bestLayout = { cols, btnH, score };
+        }
+      }
+
+      // If no layout fits above the minimum size, lock at minimum height and spill into extra rows
+      const chosenCols = bestLayout ? bestLayout.cols : maxCols;
+      const chosenHeight = Math.floor(bestLayout ? bestLayout.btnH : LAYOUT_CONFIG.minHeight);
+
+      containerEl.style.setProperty("--grid-gap", `${gap}px`);
+      containerEl.style.setProperty("--btn-height", `${chosenHeight}px`);
+      containerEl.style.gridTemplateColumns = `repeat(${chosenCols}, minmax(0, 1fr))`;
+
+      fitAllButtons(containerEl);
+    }
+
     function fitButtonText(anchor) {
       const contentEl = anchor.querySelector(".link-content");
       const labelEl = anchor.querySelector(".link-label");
@@ -325,10 +408,14 @@
 
       if (!contentEl || !labelEl) return;
 
-      const DEFAULT_LABEL_SIZE = 20;   // 1.25rem
-      const MIN_LABEL_SIZE = 15.5;     // ~0.97rem
-      const DEFAULT_DESC_SIZE = 14.8;  // 0.925rem
-      const MIN_DESC_SIZE = 12;        // 0.75rem
+      // Scale font-size targets proportionally to the button's current dynamic height
+      const btnHeight = anchor.clientHeight || 112;
+      const scale = btnHeight / 112;
+
+      const DEFAULT_LABEL_SIZE = Math.max(15, Math.min(26, 20 * scale));
+      const MIN_LABEL_SIZE = Math.max(13, Math.min(18, 15.5 * scale));
+      const DEFAULT_DESC_SIZE = Math.max(12, Math.min(18, 14.8 * scale));
+      const MIN_DESC_SIZE = Math.max(10.5, Math.min(14, 12 * scale));
 
       // Reset styles to defaults before measuring
       labelEl.style.fontSize = `${DEFAULT_LABEL_SIZE}px`;
@@ -370,7 +457,7 @@
       // 1. Default sizes fit cleanly
       if (!overflows()) return;
 
-      // 2. Dynamically shrink text sizes to fit within the fixed height
+      // 2. Dynamically shrink text sizes to fit within the button height
       let labelSize = DEFAULT_LABEL_SIZE;
       let descSize = DEFAULT_DESC_SIZE;
       let fits = false;
@@ -396,14 +483,14 @@
 
       if (fits) return;
 
-      // 3. Text is way too long: revert to default size and truncate with '...'
+      // 3. Text is still too long: revert to scaled default size and truncate with '...'
       labelEl.style.fontSize = `${DEFAULT_LABEL_SIZE}px`;
 
       if (descEl) {
         descEl.style.fontSize = `${DEFAULT_DESC_SIZE}px`;
 
-        const labelLineHeight = parseFloat(getComputedStyle(labelEl).lineHeight) || DEFAULT_LABEL_SIZE * 1.25;
-        const maxLabelLines = 2;
+        const labelLineHeight = parseFloat(getComputedStyle(labelEl).lineHeight) || DEFAULT_LABEL_SIZE * 1.22;
+        const maxLabelLines = btnHeight < 90 ? 1 : 2;
         if (labelEl.offsetHeight > labelLineHeight * maxLabelLines + 2) {
           labelEl.style.display = "-webkit-box";
           labelEl.style.webkitBoxOrient = "vertical";
@@ -413,7 +500,7 @@
 
         const descMarginTop = parseFloat(getComputedStyle(descEl).marginTop) || 0;
         const availableDescHeight = maxTextHeight - labelEl.offsetHeight - descMarginTop;
-        const descLineHeight = parseFloat(getComputedStyle(descEl).lineHeight) || DEFAULT_DESC_SIZE * 1.38;
+        const descLineHeight = parseFloat(getComputedStyle(descEl).lineHeight) || DEFAULT_DESC_SIZE * 1.35;
         const maxDescLines = Math.max(1, Math.floor((availableDescHeight + 1) / descLineHeight));
 
         descEl.style.display = "-webkit-box";
@@ -421,7 +508,7 @@
         descEl.style.webkitLineClamp = String(maxDescLines);
         descEl.style.overflow = "hidden";
       } else {
-        const labelLineHeight = parseFloat(getComputedStyle(labelEl).lineHeight) || DEFAULT_LABEL_SIZE * 1.25;
+        const labelLineHeight = parseFloat(getComputedStyle(labelEl).lineHeight) || DEFAULT_LABEL_SIZE * 1.22;
         const maxLabelLines = Math.max(1, Math.floor((maxTextHeight + 1) / labelLineHeight));
         labelEl.style.display = "-webkit-box";
         labelEl.style.webkitBoxOrient = "vertical";
@@ -544,15 +631,14 @@
 
         statusEl.hidden = true;
         containerEl.hidden = false;
-        fitAllButtons(containerEl);
+        updateGridLayout(containerEl);
 
-        // Re-evaluate text fitting whenever grid column widths change
+        // Recompute grid dimensions and text fitting whenever viewport width or height changes
         let resizeRaf = null;
-        const observer = new ResizeObserver(() => {
+        window.addEventListener("resize", () => {
           if (resizeRaf) cancelAnimationFrame(resizeRaf);
-          resizeRaf = requestAnimationFrame(() => fitAllButtons(containerEl));
+          resizeRaf = requestAnimationFrame(() => updateGridLayout(containerEl));
         });
-        observer.observe(containerEl);
       } catch (error) {
         console.error("Failed to load Google Sheet:", error);
         statusEl.innerHTML = `
