@@ -323,14 +323,21 @@
       return `https://${trimmed}`;
     }
 
+    function extractDriveFileId(rawUrl) {
+      const normalized = normalizeUrl(rawUrl);
+      if (!normalized) return null;
+      const match = normalized.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=[^&]+&)?id=)([a-zA-Z0-9_-]+)/i);
+      return match ? match[1] : null;
+    }
+
     function normalizeImageUrl(rawUrl) {
       const normalized = normalizeUrl(rawUrl);
       if (!normalized || /^(mailto:|tel:)/i.test(normalized)) return null;
 
-      // Convert standard Google Drive file sharing links into direct embeddable image URLs
-      const driveMatch = normalized.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/i);
-      if (driveMatch) {
-        return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w256`;
+      // Serve the original Google Drive image directly so PNG alpha transparency is preserved
+      const driveId = extractDriveFileId(normalized);
+      if (driveId) {
+        return `https://lh3.googleusercontent.com/d/${driveId}`;
       }
 
       return normalized;
@@ -558,7 +565,8 @@
           const labelText = row[0];
           const url = normalizeUrl(row[1]);
           const descriptionText = row[2] || "";
-          const iconSrc = normalizeImageUrl(row[3] || "");
+          const rawIconUrl = row[3] || "";
+          const iconSrc = normalizeImageUrl(rawIconUrl);
 
           if (!url) return;
 
@@ -577,7 +585,17 @@
             img.src = iconSrc;
             img.alt = "";
             img.loading = "lazy";
+
+            const driveId = extractDriveFileId(rawIconUrl);
+            const fallbackSrc = driveId
+              ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w256`
+              : null;
+
             img.onerror = () => {
+              if (fallbackSrc && img.src !== fallbackSrc) {
+                img.src = fallbackSrc;
+                return;
+              }
               iconWrap.remove();
               fitButtonText(anchor);
             };
